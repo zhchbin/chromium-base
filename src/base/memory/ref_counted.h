@@ -7,8 +7,10 @@
 
 #include <cassert>
 
+#include "base/atomic_ref_count.h"
 #include "base/base_export.h"
 #include "base/compiler_specific.h"
+#include "base/threading/thread_collision_warner.h"
 
 namespace base {
 
@@ -36,6 +38,28 @@ class BASE_EXPORT RefCountedBase {
   DFAKE_MUTEX(add_release_);
 
   DISALLOW_COPY_AND_ASSIGN(RefCountedBase);
+};
+
+class BASE_EXPORT RefCountedThreadSafeBase {
+ public:
+  bool HasOneRef() const;
+
+ protected:
+  RefCountedThreadSafeBase();
+  ~RefCountedThreadSafeBase();
+
+  void AddRef() const;
+
+  // Returns true if the object should self-delete.
+  bool Release() const;
+
+ private:
+  mutable AtomicRefCount ref_count_;
+#ifndef NDEBUG
+  mutable bool in_dtor_;
+#endif
+
+  DISALLOW_COPY_AND_ASSIGN(RefCountedThreadSafeBase);
 };
 
 }  // namespace subtle
@@ -74,6 +98,77 @@ class RefCounted : public subtle::RefCountedBase {
 
  private:
   DISALLOW_COPY_AND_ASSIGN(RefCounted<T>);
+};
+
+// Forward declaration.
+template <class T, typename Traits> class RefCountedThreadSafe;
+
+// Default traits for RefCountedThreadSafe<T>.  Deletes the object when its ref
+// count reaches 0.  Overload to delete it on a different thread etc.
+template<typename T>
+struct DefaultRefCountedThreadSafeTraits {
+  static void Destruct(const T* x) {
+    // Delete through RefCountedThreadSafe to make child classes only need to be
+    // friend with RefCountedThreadSafe instead of this struct, which is an
+    // implementation detail.
+    RefCountedThreadSafe<T,
+                         DefaultRefCountedThreadSafeTraits>::DeleteInternal(x);
+  }
+};
+
+//
+// A thread-safe variant of RefCounted<T>
+//
+//   class MyFoo : public base::RefCountedThreadSafe<MyFoo> {
+//    ...
+//   };
+//
+// If you're using the default trait, then you should add compile time
+// asserts that no one else is deleting your object.  i.e.
+//    private:
+//     friend class base::RefCountedThreadSafe<MyFoo>;
+//     ~MyFoo();
+template <class T, typename Traits = DefaultRefCountedThreadSafeTraits<T> >
+class RefCountedThreadSafe : public subtle::RefCountedThreadSafeBase {
+ public:
+  RefCountedThreadSafe() {}
+
+  void AddRef() const {
+    subtle::RefCountedThreadSafeBase::AddRef();
+  }
+
+  void Release() const {
+    if (subtle::RefCountedThreadSafeBase::Release()) {
+      Traits::Destruct(static_cast<const T*>(this));
+    }
+  }
+
+ protected:
+  ~RefCountedThreadSafe() {}
+
+ private:
+  friend struct DefaultRefCountedThreadSafeTraits<T>;
+  static void DeleteInternal(const T* x) { delete x; }
+
+  DISALLOW_COPY_AND_ASSIGN(RefCountedThreadSafe);
+};
+
+//
+// A thread-safe wrapper for some piece of data so we can place other
+// things in scoped_refptrs<>.
+//
+template<typename T>
+class RefCountedData
+    : public base::RefCountedThreadSafe< base::RefCountedData<T> > {
+ public:
+  RefCountedData() : data() {}
+  RefCountedData(const T& in_value) : data(in_value) {}
+
+  T data;
+
+ private:
+  friend class base::RefCountedThreadSafe<base::RefCountedData<T> >;
+  ~RefCountedData() {}
 };
 
 }  // namespace base
