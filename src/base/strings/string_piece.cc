@@ -14,10 +14,7 @@ namespace base {
 #if !defined(COMPILER_MSVC)
 namespace internal {
 template class StringPieceDetail<std::string>;
-template class StringPieceDetail<string16>;
 }  // namespace internal
-
-template class BasicStringPiece<string16>;
 #endif
 
 bool operator==(const StringPiece& x, const StringPiece& y) {

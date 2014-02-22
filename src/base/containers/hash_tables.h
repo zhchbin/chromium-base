@@ -24,7 +24,6 @@
 #include <utility>
 
 #include "base/basictypes.h"
-#include "base/strings/string16.h"
 #include "build/build_config.h"
 
 #if defined(COMPILER_MSVC)
@@ -103,7 +102,6 @@ DEFINE_TRIVIAL_HASH(unsigned long long);
     }
 
 DEFINE_STRING_HASH(std::string);
-DEFINE_STRING_HASH(string16);
 
 #undef DEFINE_STRING_HASH
 

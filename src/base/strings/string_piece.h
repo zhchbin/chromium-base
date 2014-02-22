@@ -31,13 +31,11 @@
 #include "base/base_export.h"
 #include "base/basictypes.h"
 #include "base/containers/hash_tables.h"
-#include "base/strings/string16.h"
 
 namespace base {
 
 template <typename STRING_TYPE> class BasicStringPiece;
 typedef BasicStringPiece<std::string> StringPiece;
-typedef BasicStringPiece<string16> StringPiece16;
 
 namespace internal {
 
@@ -154,7 +152,6 @@ StringPieceDetail<STRING_TYPE>::npos =
 // MSVC doesn't like complex extern templates and DLLs.
 #if !defined(COMPILER_MSVC)
 extern template class BASE_EXPORT StringPieceDetail<std::string>;
-extern template class BASE_EXPORT StringPieceDetail<string16>;
 #endif
 
 BASE_EXPORT void CopyToString(const StringPiece& self, std::string* target);
@@ -345,7 +342,6 @@ template <> class BasicStringPiece<std::string> :
 // We can't explicitly declare the std::string instantiation here because it was
 // already instantiated when specialized, above. Not only is it a no-op, but
 // currently it also crashes Clang (see http://crbug.com/107412).
-extern template class BASE_EXPORT BasicStringPiece<string16>;
 #endif
 
 BASE_EXPORT bool operator==(const StringPiece& x, const StringPiece& y);
@@ -369,35 +365,6 @@ inline bool operator<=(const StringPiece& x, const StringPiece& y) {
 }
 
 inline bool operator>=(const StringPiece& x, const StringPiece& y) {
-  return !(x < y);
-}
-
-inline bool operator==(const StringPiece16& x, const StringPiece16& y) {
-  if (x.size() != y.size())
-    return false;
-
-  return StringPiece16::wordmemcmp(x.data(), y.data(), x.size()) == 0;
-}
-
-inline bool operator!=(const StringPiece16& x, const StringPiece16& y) {
-  return !(x == y);
-}
-
-inline bool operator<(const StringPiece16& x, const StringPiece16& y) {
-  const int r = StringPiece16::wordmemcmp(
-      x.data(), y.data(), (x.size() < y.size() ? x.size() : y.size()));
-  return ((r < 0) || ((r == 0) && (x.size() < y.size())));
-}
-
-inline bool operator>(const StringPiece16& x, const StringPiece16& y) {
-  return y < x;
-}
-
-inline bool operator<=(const StringPiece16& x, const StringPiece16& y) {
-  return !(x > y);
-}
-
-inline bool operator>=(const StringPiece16& x, const StringPiece16& y) {
   return !(x < y);
 }
 
@@ -428,20 +395,11 @@ struct hash<base::StringPiece> {
     HASH_STRING_PIECE(base::StringPiece, sp);
   }
 };
-template<>
-struct hash<base::StringPiece16> {
-  std::size_t operator()(const base::StringPiece16& sp16) const {
-    HASH_STRING_PIECE(base::StringPiece16, sp16);
-  }
-};
 
 #elif defined(COMPILER_MSVC)
 
 inline size_t hash_value(const base::StringPiece& sp) {
   HASH_STRING_PIECE(base::StringPiece, sp);
-}
-inline size_t hash_value(const base::StringPiece16& sp16) {
-  HASH_STRING_PIECE(base::StringPiece16, sp16);
 }
 
 #endif  // COMPILER
