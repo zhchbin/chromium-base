@@ -16,6 +16,10 @@
   } while (0)
 #define CHECK_EQ(a, b) CHECK((a) == (b))
 #define CHECK_NE(a, b) CHECK((a) != (b))
+#define CHECK_LE(a, b) CHECK((a) <= (b))
+#define CHECK_LT(a, b) CHECK((a) <  (b))
+#define CHECK_GE(a, b) CHECK((a) >= (b))
+#define CHECK_GT(a, b) CHECK((a) >  (b))
 
 // debug-only checking.  not executed in NDEBUG mode.
 #define DCHECK(condition) CHECK(condition)
@@ -36,6 +40,10 @@
 #define CHECK(expression)   assert(expression)
 #define CHECK_EQ(a, b)      assert((a) == (b))
 #define CHECK_NE(a, b)      assert((a) != (b))
+#define CHECK_LE(a, b)      assert((a) <= (b))
+#define CHECK_LT(a, b)      assert((a) <  (b))
+#define CHECK_GE(a, b)      assert((a) >= (b))
+#define CHECK_GT(a, b)      assert((a) >  (b))
 
 #define DCHECK(condition) \
   while (false) \
