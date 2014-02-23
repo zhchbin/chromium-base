@@ -1,3 +1,5 @@
+#!/bin/bash
+
 git clone https://github.com/svn2github/gyp
 ./gyp/gyp --depth . base.gyp
 make
