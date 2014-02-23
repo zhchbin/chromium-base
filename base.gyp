@@ -12,7 +12,7 @@
           'CLANG_CXX_LIBRARY': 'libstdc++',
         },
         'cflags_cc': [
-          '-std=gnu++11',
+          '-std=c++0x',
         ],
       },
       'include_dirs': [
@@ -23,7 +23,7 @@
         'CLANG_CXX_LIBRARY': 'libstdc++',
       },
       'cflags_cc': [
-        '-std=gnu++11',
+        '-std=c++0x',
       ],
       'sources': [
         'src/base/atomic_ref_count.h',

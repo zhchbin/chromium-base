@@ -5,7 +5,8 @@
 #ifndef BASE_LOGGING_H_
 #define BASE_LOGGING_H_
 
-#include <cassert>
+#include <assert.h>
+#include <stdlib.h>
 
 #ifndef NDEBUG
 
