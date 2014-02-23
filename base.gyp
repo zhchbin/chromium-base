@@ -11,9 +11,6 @@
           'CLANG_CXX_LANGUAGE_STANDARD': 'gnu++11',
           'CLANG_CXX_LIBRARY': 'libstdc++',
         },
-        'cflags_cc': [
-          '-std=gnu++11',
-        ],
       },
       'include_dirs': [
         'src',
@@ -22,9 +19,6 @@
         'CLANG_CXX_LANGUAGE_STANDARD': 'gnu++11',
         'CLANG_CXX_LIBRARY': 'libstdc++',
       },
-      'cflags_cc': [
-        '-std=gnu++11',
-      ],
       'sources': [
         'src/base/atomic_ref_count.h',
         'src/base/atomicops.h',
