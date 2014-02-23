@@ -1,0 +1,2 @@
+gyp --depth . base.gyp
+make
