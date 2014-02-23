@@ -6,6 +6,18 @@
 
 #include "base/logging.h"
 
+#if defined(OS_MACOSX)
+#include <sys/resource.h>
+#endif
+
+#if defined(OS_LINUX)
+#include <sys/prctl.h>
+#include <sys/resource.h>
+#include <sys/syscall.h>
+#include <sys/time.h>
+#include <unistd.h>
+#endif
+
 namespace base {
 
 namespace {
