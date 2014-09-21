@@ -18,8 +18,6 @@
 #include "base/compiler_specific.h"
 #include "base/strings/string_piece.h"  // For implicit conversions.
 
-// Safe standard library wrappers for all platforms.
-
 namespace base {
 
 // C standard-library functions like "strncasecmp" and "snprintf" that aren't
@@ -43,14 +41,6 @@ int strncasecmp(const char* s1, const char* s2, size_t count);
 int vsnprintf(char* buffer, size_t size, const char* format, va_list arguments)
     PRINTF_FORMAT(3, 0);
 
-// vswprintf always null-terminates, but when truncation occurs, it will either
-// return -1 or the number of characters that would be in an untruncated
-// formatted string.  The actual return value depends on the underlying
-// C library's vswprintf implementation.
-int vswprintf(wchar_t* buffer, size_t size,
-              const wchar_t* format, va_list arguments)
-    WPRINTF_FORMAT(3, 0);
-
 // Some of these implementations need to be inlined.
 
 // We separate the declaration from the implementation of this inline
@@ -61,18 +51,6 @@ inline int snprintf(char* buffer, size_t size, const char* format, ...) {
   va_list arguments;
   va_start(arguments, format);
   int result = vsnprintf(buffer, size, format, arguments);
-  va_end(arguments);
-  return result;
-}
-
-// We separate the declaration from the implementation of this inline
-// function just so the WPRINTF_FORMAT works.
-inline int swprintf(wchar_t* buffer, size_t size, const wchar_t* format, ...)
-    WPRINTF_FORMAT(3, 4);
-inline int swprintf(wchar_t* buffer, size_t size, const wchar_t* format, ...) {
-  va_list arguments;
-  va_start(arguments, format);
-  int result = vswprintf(buffer, size, format, arguments);
   va_end(arguments);
   return result;
 }
@@ -139,26 +117,19 @@ template<typename Char> struct CaseInsensitiveCompareASCII {
   }
 };
 
-}  // namespace base
-
-#if defined(OS_WIN)
-#include "base/strings/string_util_win.h"
-#elif defined(OS_POSIX)
-#include "base/strings/string_util_posix.h"
-#else
-#error Define string operations appropriately for your platform
-#endif
-
+// Contains the set of characters representing whitespace in the corresponding
+// encoding. Null-terminated.
 BASE_EXPORT extern const wchar_t kWhitespaceWide[];
 BASE_EXPORT extern const char kWhitespaceASCII[];
 
+// Null-terminated string representing the UTF-8 byte order mark.
 BASE_EXPORT extern const char kUtf8ByteOrderMark[];
 
 // Removes characters in |remove_chars| from anywhere in |input|.  Returns true
 // if any characters were removed.  |remove_chars| must be null-terminated.
 // NOTE: Safe to use the same variable for both |input| and |output|.
 BASE_EXPORT bool RemoveChars(const std::string& input,
-                             const char remove_chars[],
+                             const base::StringPiece& remove_chars,
                              std::string* output);
 
 // Replaces characters in |replace_chars| from anywhere in |input| with
@@ -167,18 +138,15 @@ BASE_EXPORT bool RemoveChars(const std::string& input,
 // |replace_chars| must be null-terminated.
 // NOTE: Safe to use the same variable for both |input| and |output|.
 BASE_EXPORT bool ReplaceChars(const std::string& input,
-                              const char replace_chars[],
+                              const base::StringPiece& replace_chars,
                               const std::string& replace_with,
                               std::string* output);
 
 // Removes characters in |trim_chars| from the beginning and end of |input|.
 // |trim_chars| must be null-terminated.
 // NOTE: Safe to use the same variable for both |input| and |output|.
-BASE_EXPORT bool TrimString(const std::wstring& input,
-                            const wchar_t trim_chars[],
-                            std::wstring* output);
 BASE_EXPORT bool TrimString(const std::string& input,
-                            const char trim_chars[],
+                            const base::StringPiece& trim_chars,
                             std::string* output);
 
 // Trims any whitespace from either end of the input string.  Returns where
@@ -212,37 +180,20 @@ BASE_EXPORT TrimPositions TrimWhitespace(const std::string& input,
 // (2) If |trim_sequences_with_line_breaks| is true, any other whitespace
 //     sequences containing a CR or LF are trimmed.
 // (3) All other whitespace sequences are converted to single spaces.
-BASE_EXPORT std::wstring CollapseWhitespace(
-    const std::wstring& text,
-    bool trim_sequences_with_line_breaks);
 BASE_EXPORT std::string CollapseWhitespaceASCII(
     const std::string& text,
     bool trim_sequences_with_line_breaks);
 
-// Returns true if the passed string is empty or contains only white-space
-// characters.
-BASE_EXPORT bool ContainsOnlyWhitespaceASCII(const std::string& str);
-
 // Returns true if |input| is empty or contains only characters found in
 // |characters|.
-BASE_EXPORT bool ContainsOnlyChars(const std::wstring& input,
-                                   const std::wstring& characters);
-BASE_EXPORT bool ContainsOnlyChars(const std::string& input,
-                                   const std::string& characters);
-
-// Converts to 7-bit ASCII by truncating. The result must be known to be ASCII
-// beforehand.
-BASE_EXPORT std::string WideToASCII(const std::wstring& wide);
-
-// Converts the given wide string to the corresponding Latin1. This will fail
-// (return false) if any characters are more than 255.
-BASE_EXPORT bool WideToLatin1(const std::wstring& wide, std::string* latin1);
+BASE_EXPORT bool ContainsOnlyChars(const StringPiece& input,
+                                   const StringPiece& characters);
 
 // Converts the elements of the given string.  This version uses a pointer to
 // clearly differentiate it from the non-pointer variant.
 template <class str> inline void StringToLowerASCII(str* s) {
   for (typename str::iterator i = s->begin(); i != s->end(); ++i)
-    *i = base::ToLowerASCII(*i);
+    *i = ToLowerASCII(*i);
 }
 
 template <class str> inline str StringToLowerASCII(const str& s) {
@@ -251,6 +202,16 @@ template <class str> inline str StringToLowerASCII(const str& s) {
   StringToLowerASCII(&output);
   return output;
 }
+
+}  // namespace base
+
+#if defined(OS_WIN)
+#include "base/strings/string_util_win.h"
+#elif defined(OS_POSIX)
+#include "base/strings/string_util_posix.h"
+#else
+#error Define string operations appropriately for your platform
+#endif
 
 // Converts the elements of the given string.  This version uses a pointer to
 // clearly differentiate it from the non-pointer variant.
@@ -271,36 +232,23 @@ template <class str> inline str StringToUpperASCII(const str& s) {
 // token, and it is optimized to avoid intermediate string copies.  This API is
 // borrowed from the equivalent APIs in Mozilla.
 BASE_EXPORT bool LowerCaseEqualsASCII(const std::string& a, const char* b);
-BASE_EXPORT bool LowerCaseEqualsASCII(const std::wstring& a, const char* b);
 
 // Same thing, but with string iterators instead.
 BASE_EXPORT bool LowerCaseEqualsASCII(std::string::const_iterator a_begin,
                                       std::string::const_iterator a_end,
                                       const char* b);
-BASE_EXPORT bool LowerCaseEqualsASCII(std::wstring::const_iterator a_begin,
-                                      std::wstring::const_iterator a_end,
-                                      const char* b);
 BASE_EXPORT bool LowerCaseEqualsASCII(const char* a_begin,
                                       const char* a_end,
-                                      const char* b);
-BASE_EXPORT bool LowerCaseEqualsASCII(const wchar_t* a_begin,
-                                      const wchar_t* a_end,
                                       const char* b);
 
 // Returns true if str starts with search, or false otherwise.
 BASE_EXPORT bool StartsWithASCII(const std::string& str,
                                  const std::string& search,
                                  bool case_sensitive);
-BASE_EXPORT bool StartsWith(const std::wstring& str,
-                            const std::wstring& search,
-                            bool case_sensitive);
 
 // Returns true if str ends with search, or false otherwise.
 BASE_EXPORT bool EndsWith(const std::string& str,
                           const std::string& search,
-                          bool case_sensitive);
-BASE_EXPORT bool EndsWith(const std::wstring& str,
-                          const std::wstring& search,
                           bool case_sensitive);
 
 
@@ -340,14 +288,14 @@ inline Char HexDigitToInt(Char c) {
 
 // Returns true if it's a whitespace character.
 inline bool IsWhitespace(wchar_t c) {
-  return wcschr(kWhitespaceWide, c) != NULL;
+  return wcschr(base::kWhitespaceWide, c) != NULL;
 }
 
 // Starting at |start_offset| (usually 0), replace the first instance of
 // |find_this| with |replace_with|.
 BASE_EXPORT void ReplaceFirstSubstringAfterOffset(
     std::string* str,
-    std::string::size_type start_offset,
+    size_t start_offset,
     const std::string& find_this,
     const std::string& replace_with);
 
@@ -357,11 +305,10 @@ BASE_EXPORT void ReplaceFirstSubstringAfterOffset(
 // This does entire substrings; use std::replace in <algorithm> for single
 // characters, for example:
 //   std::replace(str.begin(), str.end(), 'a', 'b');
-BASE_EXPORT void ReplaceSubstringsAfterOffset(
-    std::string* str,
-    std::string::size_type start_offset,
-    const std::string& find_this,
-    const std::string& replace_with);
+BASE_EXPORT void ReplaceSubstringsAfterOffset(std::string* str,
+                                              size_t start_offset,
+                                              const std::string& find_this,
+                                              const std::string& replace_with);
 
 // Reserves enough memory in |str| to accommodate |length_with_null| characters,
 // sets the size of |str| to |length_with_null - 1| characters, and returns a
@@ -397,9 +344,6 @@ inline typename string_type::value_type* WriteInto(string_type* str,
 // Splits a string into its fields delimited by any of the characters in
 // |delimiters|.  Each field is added to the |tokens| vector.  Returns the
 // number of tokens found.
-BASE_EXPORT size_t Tokenize(const std::wstring& str,
-                            const std::wstring& delimiters,
-                            std::vector<std::wstring>* tokens);
 BASE_EXPORT size_t Tokenize(const std::string& str,
                             const std::string& delimiters,
                             std::vector<std::string>* tokens);
