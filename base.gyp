@@ -78,6 +78,7 @@
         'src/base/strings/string_tokenizer.h',
         'src/base/strings/string_util.cc',
         'src/base/strings/string_util.h',
+        'src/base/strings/string_util_constants.cc',
         'src/base/strings/string_util_posix.h',
         'src/base/strings/string_util_win.h',
         'src/base/strings/stringize_macros.h',
