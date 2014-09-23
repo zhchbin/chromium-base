@@ -25,7 +25,7 @@
  */
 
 #ifdef _MSC_VER
-# include <windows.h>
+# include <WinSock2.h>
 #endif
 
 #ifdef __cplusplus
