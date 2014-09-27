@@ -7,7 +7,7 @@
 #ifndef BASE_ATOMICOPS_INTERNALS_X86_MSVC_H_
 #define BASE_ATOMICOPS_INTERNALS_X86_MSVC_H_
 
-#include <windows.h>
+#include <WinSock2.h>
 
 #if defined(ARCH_CPU_64_BITS)
 // windows.h #defines this (only on x64). This causes problems because the
