@@ -9,9 +9,8 @@
 namespace base {
 namespace internal {
 
-bool CallbackBase::is_null() const {
-  return bind_state_.get() == NULL;
-}
+CallbackBase::CallbackBase(const CallbackBase& c) = default;
+CallbackBase& CallbackBase::operator=(const CallbackBase& c) = default;
 
 void CallbackBase::Reset() {
   polymorphic_invoke_ = NULL;

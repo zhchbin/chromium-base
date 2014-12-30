@@ -48,24 +48,27 @@
 // ------------------------- IMPORTANT: Thread-safety -------------------------
 
 // Weak pointers may be passed safely between threads, but must always be
-// dereferenced and invalidated on the same thread otherwise checking the
-// pointer would be racey.
+// dereferenced and invalidated on the same SequencedTaskRunner otherwise
+// checking the pointer would be racey.
 //
 // To ensure correct use, the first time a WeakPtr issued by a WeakPtrFactory
 // is dereferenced, the factory and its WeakPtrs become bound to the calling
-// thread, and cannot be dereferenced or invalidated on any other thread. Bound
-// WeakPtrs can still be handed off to other threads, e.g. to use to post tasks
-// back to object on the bound thread.
+// thread or current SequencedWorkerPool token, and cannot be dereferenced or
+// invalidated on any other task runner. Bound WeakPtrs can still be handed
+// off to other task runners, e.g. to use to post tasks back to object on the
+// bound sequence.
 //
-// Invalidating the factory's WeakPtrs un-binds it from the thread, allowing it
-// to be passed for a different thread to use or delete it.
+// Invalidating the factory's WeakPtrs un-binds it from the sequence, allowing
+// it to be passed for a different sequence to use or delete it.
 
 #ifndef BASE_MEMORY_WEAK_PTR_H_
 #define BASE_MEMORY_WEAK_PTR_H_
 
 #include "base/basictypes.h"
 #include "base/base_export.h"
+#include "base/logging.h"
 #include "base/memory/ref_counted.h"
+#include "base/sequence_checker.h"
 #include "base/template_util.h"
 
 namespace base {
@@ -79,9 +82,9 @@ namespace internal {
 
 class BASE_EXPORT WeakReference {
  public:
-  // Although Flag is bound to a specific thread, it may be deleted from another
-  // via base::WeakPtr::~WeakPtr().
-  class Flag : public RefCountedThreadSafe<Flag> {
+  // Although Flag is bound to a specific SequencedTaskRunner, it may be
+  // deleted from another via base::WeakPtr::~WeakPtr().
+  class BASE_EXPORT Flag : public RefCountedThreadSafe<Flag> {
    public:
     Flag();
 
@@ -93,6 +96,7 @@ class BASE_EXPORT WeakReference {
 
     ~Flag();
 
+    SequenceChecker sequence_checker_;
     bool is_valid_;
   };
 
@@ -200,9 +204,11 @@ class WeakPtr : public internal::WeakPtrBase {
   T* get() const { return ref_.is_valid() ? ptr_ : NULL; }
 
   T& operator*() const {
+    DCHECK(get() != NULL);
     return *get();
   }
   T* operator->() const {
+    DCHECK(get() != NULL);
     return get();
   }
 
@@ -261,16 +267,19 @@ class WeakPtrFactory {
   }
 
   WeakPtr<T> GetWeakPtr() {
+    DCHECK(ptr_);
     return WeakPtr<T>(weak_reference_owner_.GetRef(), ptr_);
   }
 
   // Call this method to invalidate all existing weak pointers.
   void InvalidateWeakPtrs() {
+    DCHECK(ptr_);
     weak_reference_owner_.Invalidate();
   }
 
   // Call this method to determine if any weak pointers exist.
   bool HasWeakPtrs() const {
+    DCHECK(ptr_);
     return weak_reference_owner_.HasRefs();
   }
 

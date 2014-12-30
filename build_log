@@ -1,0 +1,4 @@
+ninja: Entering directory `out/Default/'
+[1/3] CXX obj/src/base/base.sequenced_task_runner.o
+[2/3] AR obj/libbase.a
+[3/3] LINK test_base

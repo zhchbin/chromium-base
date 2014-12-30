@@ -5,58 +5,16 @@
 #include "base/threading/thread_collision_warner.h"
 
 #include "base/logging.h"
-
-#if defined(OS_MACOSX)
-#include <sys/resource.h>
-#endif
-
-#if defined(OS_LINUX)
-#include <sys/prctl.h>
-#include <sys/resource.h>
-#include <sys/syscall.h>
-#include <sys/time.h>
-#include <unistd.h>
-#endif
+#include "base/threading/platform_thread.h"
 
 namespace base {
 
-namespace {
-#if defined(OS_WIN)
-typedef DWORD PlatformThreadId;
-#elif defined(OS_POSIX)
-typedef pid_t PlatformThreadId;
-#endif
-
-PlatformThreadId CurrentId() {
-  // Pthreads doesn't have the concept of a thread ID, so we have to reach down
-  // into the kernel.
-#if defined(OS_MACOSX)
-  return pthread_mach_thread_np(pthread_self());
-#elif defined(OS_LINUX)
-  return syscall(__NR_gettid);
-#elif defined(OS_ANDROID)
-  return gettid();
-#elif defined(OS_SOLARIS)
-  return pthread_self();
-#elif defined(OS_NACL) && defined(__GLIBC__)
-  return pthread_self();
-#elif defined(OS_NACL) && !defined(__GLIBC__)
-  // Pointers are 32-bits in NaCl.
-  return reinterpret_cast<int32>(pthread_self());
-#elif defined(OS_POSIX)
-  return reinterpret_cast<int64>(pthread_self());
-#elif defined(OS_WIN)
-  return GetCurrentThreadId();
-#endif
-}
-}  // namespace
-
 void DCheckAsserter::warn() {
-  NOTREACHED();
+  NOTREACHED() << "Thread Collision";
 }
 
 static subtle::Atomic32 CurrentThread() {
-  const PlatformThreadId current_thread_id = CurrentId();
+  const PlatformThreadId current_thread_id = PlatformThread::CurrentId();
   // We need to get the thread id into an atomic data type. This might be a
   // truncating conversion, but any loss-of-information just increases the
   // chance of a fault negative, not a false positive.

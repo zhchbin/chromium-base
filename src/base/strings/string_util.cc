@@ -19,9 +19,31 @@
 #include <vector>
 
 #include "base/basictypes.h"
+#include "base/logging.h"
+#include "base/memory/singleton.h"
+#include "base/strings/utf_string_conversion_utils.h"
+#include "base/strings/utf_string_conversions.h"
+#include "base/third_party/icu/icu_utf.h"
 #include "build/build_config.h"
 
+// Remove when this entire file is in the base namespace.
+using base::char16;
+using base::string16;
+
 namespace {
+
+// Force the singleton used by EmptyString[16] to be a unique type. This
+// prevents other code that might accidentally use Singleton<string> from
+// getting our internal one.
+struct EmptyStrings {
+  EmptyStrings() {}
+  const std::string s;
+  const string16 s16;
+
+  static EmptyStrings* GetInstance() {
+    return Singleton<EmptyStrings>::get();
+  }
+};
 
 // Used by ReplaceStringPlaceholders to track the position in the string of
 // replaced parameters.
@@ -41,6 +63,42 @@ static bool CompareParameter(const ReplacementOffset& elem1,
                              const ReplacementOffset& elem2) {
   return elem1.parameter < elem2.parameter;
 }
+
+// Assuming that a pointer is the size of a "machine word", then
+// uintptr_t is an integer type that is also a machine word.
+typedef uintptr_t MachineWord;
+const uintptr_t kMachineWordAlignmentMask = sizeof(MachineWord) - 1;
+
+inline bool IsAlignedToMachineWord(const void* pointer) {
+  return !(reinterpret_cast<MachineWord>(pointer) & kMachineWordAlignmentMask);
+}
+
+template<typename T> inline T* AlignToMachineWord(T* pointer) {
+  return reinterpret_cast<T*>(reinterpret_cast<MachineWord>(pointer) &
+                              ~kMachineWordAlignmentMask);
+}
+
+template<size_t size, typename CharacterType> struct NonASCIIMask;
+template<> struct NonASCIIMask<4, base::char16> {
+    static inline uint32_t value() { return 0xFF80FF80U; }
+};
+template<> struct NonASCIIMask<4, char> {
+    static inline uint32_t value() { return 0x80808080U; }
+};
+template<> struct NonASCIIMask<8, base::char16> {
+    static inline uint64_t value() { return 0xFF80FF80FF80FF80ULL; }
+};
+template<> struct NonASCIIMask<8, char> {
+    static inline uint64_t value() { return 0x8080808080808080ULL; }
+};
+#if defined(WCHAR_T_IS_UTF32)
+template<> struct NonASCIIMask<4, wchar_t> {
+    static inline uint32_t value() { return 0xFFFFFF80U; }
+};
+template<> struct NonASCIIMask<8, wchar_t> {
+    static inline uint64_t value() { return 0xFFFFFF80FFFFFF80ULL; }
+};
+#endif  // WCHAR_T_IS_UTF32
 
 }  // namespace
 
@@ -81,6 +139,14 @@ bool IsWprintfFormatPortable(const wchar_t* format) {
   return true;
 }
 
+const std::string& EmptyString() {
+  return EmptyStrings::GetInstance()->s;
+}
+
+const string16& EmptyString16() {
+  return EmptyStrings::GetInstance()->s16;
+}
+
 template<typename STR>
 bool ReplaceCharsT(const STR& input,
                    const STR& replace_chars,
@@ -101,11 +167,24 @@ bool ReplaceCharsT(const STR& input,
   return removed;
 }
 
+bool ReplaceChars(const string16& input,
+                  const base::StringPiece16& replace_chars,
+                  const string16& replace_with,
+                  string16* output) {
+  return ReplaceCharsT(input, replace_chars.as_string(), replace_with, output);
+}
+
 bool ReplaceChars(const std::string& input,
                   const base::StringPiece& replace_chars,
                   const std::string& replace_with,
                   std::string* output) {
   return ReplaceCharsT(input, replace_chars.as_string(), replace_with, output);
+}
+
+bool RemoveChars(const string16& input,
+                 const base::StringPiece16& remove_chars,
+                 string16* output) {
+  return ReplaceChars(input, remove_chars.as_string(), string16(), output);
 }
 
 bool RemoveChars(const std::string& input,
@@ -146,11 +225,61 @@ TrimPositions TrimStringT(const STR& input,
       ((last_good_char == last_char) ? TRIM_NONE : TRIM_TRAILING));
 }
 
+bool TrimString(const string16& input,
+                const base::StringPiece16& trim_chars,
+                string16* output) {
+  return TrimStringT(input, trim_chars.as_string(), TRIM_ALL, output) !=
+      TRIM_NONE;
+}
+
 bool TrimString(const std::string& input,
                 const base::StringPiece& trim_chars,
                 std::string* output) {
   return TrimStringT(input, trim_chars.as_string(), TRIM_ALL, output) !=
       TRIM_NONE;
+}
+
+void TruncateUTF8ToByteSize(const std::string& input,
+                            const size_t byte_size,
+                            std::string* output) {
+  DCHECK(output);
+  if (byte_size > input.length()) {
+    *output = input;
+    return;
+  }
+  DCHECK_LE(byte_size, static_cast<uint32>(kint32max));
+  // Note: This cast is necessary because CBU8_NEXT uses int32s.
+  int32 truncation_length = static_cast<int32>(byte_size);
+  int32 char_index = truncation_length - 1;
+  const char* data = input.data();
+
+  // Using CBU8, we will move backwards from the truncation point
+  // to the beginning of the string looking for a valid UTF8
+  // character.  Once a full UTF8 character is found, we will
+  // truncate the string to the end of that character.
+  while (char_index >= 0) {
+    int32 prev = char_index;
+    base_icu::UChar32 code_point = 0;
+    CBU8_NEXT(data, char_index, truncation_length, code_point);
+    if (!IsValidCharacter(code_point) ||
+        !IsValidCodepoint(code_point)) {
+      char_index = prev - 1;
+    } else {
+      break;
+    }
+  }
+
+  if (char_index >= 0 )
+    *output = input.substr(0, char_index);
+  else
+    output->clear();
+}
+
+TrimPositions TrimWhitespace(const string16& input,
+                             TrimPositions positions,
+                             string16* output) {
+  return TrimStringT(input, base::string16(kWhitespaceUTF16), positions,
+                     output);
 }
 
 TrimPositions TrimWhitespaceASCII(const std::string& input,
@@ -209,6 +338,11 @@ STR CollapseWhitespaceT(const STR& text,
   return result;
 }
 
+string16 CollapseWhitespace(const string16& text,
+                            bool trim_sequences_with_line_breaks) {
+  return CollapseWhitespaceT(text, trim_sequences_with_line_breaks);
+}
+
 std::string CollapseWhitespaceASCII(const std::string& text,
                                     bool trim_sequences_with_line_breaks) {
   return CollapseWhitespaceT(text, trim_sequences_with_line_breaks);
@@ -219,18 +353,71 @@ bool ContainsOnlyChars(const StringPiece& input,
   return input.find_first_not_of(characters) == StringPiece::npos;
 }
 
-template<class STR>
-static bool DoIsStringASCII(const STR& str) {
-  for (size_t i = 0; i < str.length(); i++) {
-    typename ToUnsigned<typename STR::value_type>::Unsigned c = str[i];
-    if (c > 0x7F)
-      return false;
+bool ContainsOnlyChars(const StringPiece16& input,
+                       const StringPiece16& characters) {
+  return input.find_first_not_of(characters) == StringPiece16::npos;
+}
+
+template <class Char>
+inline bool DoIsStringASCII(const Char* characters, size_t length) {
+  MachineWord all_char_bits = 0;
+  const Char* end = characters + length;
+
+  // Prologue: align the input.
+  while (!IsAlignedToMachineWord(characters) && characters != end) {
+    all_char_bits |= *characters;
+    ++characters;
   }
-  return true;
+
+  // Compare the values of CPU word size.
+  const Char* word_end = AlignToMachineWord(end);
+  const size_t loop_increment = sizeof(MachineWord) / sizeof(Char);
+  while (characters < word_end) {
+    all_char_bits |= *(reinterpret_cast<const MachineWord*>(characters));
+    characters += loop_increment;
+  }
+
+  // Process the remaining bytes.
+  while (characters != end) {
+    all_char_bits |= *characters;
+    ++characters;
+  }
+
+  MachineWord non_ascii_bit_mask =
+      NonASCIIMask<sizeof(MachineWord), Char>::value();
+  return !(all_char_bits & non_ascii_bit_mask);
 }
 
 bool IsStringASCII(const StringPiece& str) {
-  return DoIsStringASCII(str);
+  return DoIsStringASCII(str.data(), str.length());
+}
+
+bool IsStringASCII(const StringPiece16& str) {
+  return DoIsStringASCII(str.data(), str.length());
+}
+
+bool IsStringASCII(const string16& str) {
+  return DoIsStringASCII(str.data(), str.length());
+}
+
+#if defined(WCHAR_T_IS_UTF32)
+bool IsStringASCII(const std::wstring& str) {
+  return DoIsStringASCII(str.data(), str.length());
+}
+#endif
+
+bool IsStringUTF8(const StringPiece& str) {
+  const char *src = str.data();
+  int32 src_len = static_cast<int32>(str.length());
+  int32 char_index = 0;
+
+  while (char_index < src_len) {
+    int32 code_point;
+    CBU8_NEXT(src, char_index, src_len, code_point);
+    if (!IsValidCharacter(code_point))
+      return false;
+  }
+  return true;
 }
 
 }  // namespace base
@@ -251,8 +438,18 @@ bool LowerCaseEqualsASCII(const std::string& a, const char* b) {
   return DoLowerCaseEqualsASCII(a.begin(), a.end(), b);
 }
 
+bool LowerCaseEqualsASCII(const string16& a, const char* b) {
+  return DoLowerCaseEqualsASCII(a.begin(), a.end(), b);
+}
+
 bool LowerCaseEqualsASCII(std::string::const_iterator a_begin,
                           std::string::const_iterator a_end,
+                          const char* b) {
+  return DoLowerCaseEqualsASCII(a_begin, a_end, b);
+}
+
+bool LowerCaseEqualsASCII(string16::const_iterator a_begin,
+                          string16::const_iterator a_end,
                           const char* b) {
   return DoLowerCaseEqualsASCII(a_begin, a_end, b);
 }
@@ -265,7 +462,19 @@ bool LowerCaseEqualsASCII(const char* a_begin,
   return DoLowerCaseEqualsASCII(a_begin, a_end, b);
 }
 
+bool LowerCaseEqualsASCII(const char16* a_begin,
+                          const char16* a_end,
+                          const char* b) {
+  return DoLowerCaseEqualsASCII(a_begin, a_end, b);
+}
+
 #endif  // !defined(OS_ANDROID)
+
+bool EqualsASCII(const string16& a, const base::StringPiece& b) {
+  if (a.length() != b.length())
+    return false;
+  return std::equal(b.begin(), b.end(), a.begin());
+}
 
 bool StartsWithASCII(const std::string& str,
                      const std::string& search,
@@ -288,6 +497,11 @@ bool StartsWithT(const STR& str, const STR& search, bool case_sensitive) {
   }
 }
 
+bool StartsWith(const string16& str, const string16& search,
+                bool case_sensitive) {
+  return StartsWithT(str, search, case_sensitive);
+}
+
 template <typename STR>
 bool EndsWithT(const STR& str, const STR& search, bool case_sensitive) {
   size_t str_length = str.length();
@@ -306,6 +520,11 @@ bool EndsWith(const std::string& str, const std::string& search,
   return EndsWithT(str, search, case_sensitive);
 }
 
+bool EndsWith(const string16& str, const string16& search,
+              bool case_sensitive) {
+  return EndsWithT(str, search, case_sensitive);
+}
+
 static const char* const kByteStringsUnlocalized[] = {
   " B",
   " kB",
@@ -314,6 +533,28 @@ static const char* const kByteStringsUnlocalized[] = {
   " TB",
   " PB"
 };
+
+string16 FormatBytesUnlocalized(int64 bytes) {
+  double unit_amount = static_cast<double>(bytes);
+  size_t dimension = 0;
+  const int kKilo = 1024;
+  while (unit_amount >= kKilo &&
+         dimension < arraysize(kByteStringsUnlocalized) - 1) {
+    unit_amount /= kKilo;
+    dimension++;
+  }
+
+  char buf[64];
+  if (bytes != 0 && dimension > 0 && unit_amount < 100) {
+    base::snprintf(buf, arraysize(buf), "%.1lf%s", unit_amount,
+                   kByteStringsUnlocalized[dimension]);
+  } else {
+    base::snprintf(buf, arraysize(buf), "%.0lf%s", unit_amount,
+                   kByteStringsUnlocalized[dimension]);
+  }
+
+  return base::ASCIIToUTF16(buf);
+}
 
 template<class StringType>
 void DoReplaceSubstringsAfterOffset(StringType* str,
@@ -335,12 +576,28 @@ void DoReplaceSubstringsAfterOffset(StringType* str,
   }
 }
 
+void ReplaceFirstSubstringAfterOffset(string16* str,
+                                      size_t start_offset,
+                                      const string16& find_this,
+                                      const string16& replace_with) {
+  DoReplaceSubstringsAfterOffset(str, start_offset, find_this, replace_with,
+                                 false);  // replace first instance
+}
+
 void ReplaceFirstSubstringAfterOffset(std::string* str,
                                       size_t start_offset,
                                       const std::string& find_this,
                                       const std::string& replace_with) {
   DoReplaceSubstringsAfterOffset(str, start_offset, find_this, replace_with,
                                  false);  // replace first instance
+}
+
+void ReplaceSubstringsAfterOffset(string16* str,
+                                  size_t start_offset,
+                                  const string16& find_this,
+                                  const string16& replace_with) {
+  DoReplaceSubstringsAfterOffset(str, start_offset, find_this, replace_with,
+                                 true);  // replace all instances
 }
 
 void ReplaceSubstringsAfterOffset(std::string* str,
@@ -371,6 +628,12 @@ static size_t TokenizeT(const STR& str,
   }
 
   return tokens->size();
+}
+
+size_t Tokenize(const string16& str,
+                const string16& delimiters,
+                std::vector<string16>* tokens) {
+  return TokenizeT(str, delimiters, tokens);
 }
 
 size_t Tokenize(const std::string& str,
@@ -406,8 +669,17 @@ std::string JoinString(const std::vector<std::string>& parts, char sep) {
   return JoinStringT(parts, std::string(1, sep));
 }
 
+string16 JoinString(const std::vector<string16>& parts, char16 sep) {
+  return JoinStringT(parts, string16(1, sep));
+}
+
 std::string JoinString(const std::vector<std::string>& parts,
                        const std::string& separator) {
+  return JoinStringT(parts, separator);
+}
+
+string16 JoinString(const std::vector<string16>& parts,
+                    const string16& separator) {
   return JoinStringT(parts, separator);
 }
 
@@ -431,6 +703,7 @@ OutStringType DoReplaceStringPlaceholders(const FormatStringType& format_string,
     if ('$' == *i) {
       if (i + 1 != format_string.end()) {
         ++i;
+        DCHECK('$' == *i || '1' <= *i) << "Invalid placeholder: " << *i;
         if ('$' == *i) {
           while (i != format_string.end() && '$' == *i) {
             formatted.push_back('$');
@@ -472,10 +745,185 @@ OutStringType DoReplaceStringPlaceholders(const FormatStringType& format_string,
   return formatted;
 }
 
+string16 ReplaceStringPlaceholders(const string16& format_string,
+                                   const std::vector<string16>& subst,
+                                   std::vector<size_t>* offsets) {
+  return DoReplaceStringPlaceholders(format_string, subst, offsets);
+}
+
 std::string ReplaceStringPlaceholders(const base::StringPiece& format_string,
                                       const std::vector<std::string>& subst,
                                       std::vector<size_t>* offsets) {
   return DoReplaceStringPlaceholders(format_string, subst, offsets);
+}
+
+string16 ReplaceStringPlaceholders(const string16& format_string,
+                                   const string16& a,
+                                   size_t* offset) {
+  std::vector<size_t> offsets;
+  std::vector<string16> subst;
+  subst.push_back(a);
+  string16 result = ReplaceStringPlaceholders(format_string, subst, &offsets);
+
+  DCHECK_EQ(1U, offsets.size());
+  if (offset)
+    *offset = offsets[0];
+  return result;
+}
+
+static bool IsWildcard(base_icu::UChar32 character) {
+  return character == '*' || character == '?';
+}
+
+// Move the strings pointers to the point where they start to differ.
+template <typename CHAR, typename NEXT>
+static void EatSameChars(const CHAR** pattern, const CHAR* pattern_end,
+                         const CHAR** string, const CHAR* string_end,
+                         NEXT next) {
+  const CHAR* escape = NULL;
+  while (*pattern != pattern_end && *string != string_end) {
+    if (!escape && IsWildcard(**pattern)) {
+      // We don't want to match wildcard here, except if it's escaped.
+      return;
+    }
+
+    // Check if the escapement char is found. If so, skip it and move to the
+    // next character.
+    if (!escape && **pattern == '\\') {
+      escape = *pattern;
+      next(pattern, pattern_end);
+      continue;
+    }
+
+    // Check if the chars match, if so, increment the ptrs.
+    const CHAR* pattern_next = *pattern;
+    const CHAR* string_next = *string;
+    base_icu::UChar32 pattern_char = next(&pattern_next, pattern_end);
+    if (pattern_char == next(&string_next, string_end) &&
+        pattern_char != CBU_SENTINEL) {
+      *pattern = pattern_next;
+      *string = string_next;
+    } else {
+      // Uh oh, it did not match, we are done. If the last char was an
+      // escapement, that means that it was an error to advance the ptr here,
+      // let's put it back where it was. This also mean that the MatchPattern
+      // function will return false because if we can't match an escape char
+      // here, then no one will.
+      if (escape) {
+        *pattern = escape;
+      }
+      return;
+    }
+
+    escape = NULL;
+  }
+}
+
+template <typename CHAR, typename NEXT>
+static void EatWildcard(const CHAR** pattern, const CHAR* end, NEXT next) {
+  while (*pattern != end) {
+    if (!IsWildcard(**pattern))
+      return;
+    next(pattern, end);
+  }
+}
+
+template <typename CHAR, typename NEXT>
+static bool MatchPatternT(const CHAR* eval, const CHAR* eval_end,
+                          const CHAR* pattern, const CHAR* pattern_end,
+                          int depth,
+                          NEXT next) {
+  const int kMaxDepth = 16;
+  if (depth > kMaxDepth)
+    return false;
+
+  // Eat all the matching chars.
+  EatSameChars(&pattern, pattern_end, &eval, eval_end, next);
+
+  // If the string is empty, then the pattern must be empty too, or contains
+  // only wildcards.
+  if (eval == eval_end) {
+    EatWildcard(&pattern, pattern_end, next);
+    return pattern == pattern_end;
+  }
+
+  // Pattern is empty but not string, this is not a match.
+  if (pattern == pattern_end)
+    return false;
+
+  // If this is a question mark, then we need to compare the rest with
+  // the current string or the string with one character eaten.
+  const CHAR* next_pattern = pattern;
+  next(&next_pattern, pattern_end);
+  if (pattern[0] == '?') {
+    if (MatchPatternT(eval, eval_end, next_pattern, pattern_end,
+                      depth + 1, next))
+      return true;
+    const CHAR* next_eval = eval;
+    next(&next_eval, eval_end);
+    if (MatchPatternT(next_eval, eval_end, next_pattern, pattern_end,
+                      depth + 1, next))
+      return true;
+  }
+
+  // This is a *, try to match all the possible substrings with the remainder
+  // of the pattern.
+  if (pattern[0] == '*') {
+    // Collapse duplicate wild cards (********** into *) so that the
+    // method does not recurse unnecessarily. http://crbug.com/52839
+    EatWildcard(&next_pattern, pattern_end, next);
+
+    while (eval != eval_end) {
+      if (MatchPatternT(eval, eval_end, next_pattern, pattern_end,
+                        depth + 1, next))
+        return true;
+      eval++;
+    }
+
+    // We reached the end of the string, let see if the pattern contains only
+    // wildcards.
+    if (eval == eval_end) {
+      EatWildcard(&pattern, pattern_end, next);
+      if (pattern != pattern_end)
+        return false;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+struct NextCharUTF8 {
+  base_icu::UChar32 operator()(const char** p, const char* end) {
+    base_icu::UChar32 c;
+    int offset = 0;
+    CBU8_NEXT(*p, offset, end - *p, c);
+    *p += offset;
+    return c;
+  }
+};
+
+struct NextCharUTF16 {
+  base_icu::UChar32 operator()(const char16** p, const char16* end) {
+    base_icu::UChar32 c;
+    int offset = 0;
+    CBU16_NEXT(*p, offset, end - *p, c);
+    *p += offset;
+    return c;
+  }
+};
+
+bool MatchPattern(const base::StringPiece& eval,
+                  const base::StringPiece& pattern) {
+  return MatchPatternT(eval.data(), eval.data() + eval.size(),
+                       pattern.data(), pattern.data() + pattern.size(),
+                       0, NextCharUTF8());
+}
+
+bool MatchPattern(const string16& eval, const string16& pattern) {
+  return MatchPatternT(eval.c_str(), eval.c_str() + eval.size(),
+                       pattern.c_str(), pattern.c_str() + pattern.size(),
+                       0, NextCharUTF16());
 }
 
 // The following code is compatible with the OpenBSD lcpy interface.  See:

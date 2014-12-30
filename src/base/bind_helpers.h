@@ -12,7 +12,7 @@
 //
 // ARGUMENT BINDING WRAPPERS
 //
-// The wrapper functions are base::Unretained(), base::Owned(), bass::Passed(),
+// The wrapper functions are base::Unretained(), base::Owned(), base::Passed(),
 // base::ConstRef(), and base::IgnoreResult().
 //
 // Unretained() allows Bind() to bind a non-refcounted class, and to disable
@@ -145,7 +145,6 @@
 
 #include "base/basictypes.h"
 #include "base/callback.h"
-#include "base/logging.h"
 #include "base/memory/weak_ptr.h"
 #include "base/template_util.h"
 
@@ -252,7 +251,7 @@ class SupportsAddRefAndRelease {
   static Yes& Check(...);
 
  public:
-  static const bool value = sizeof(Check<Base>(0)) == sizeof(Yes);
+  enum { value = sizeof(Check<Base>(0)) == sizeof(Yes) };
 };
 
 // Helpers to assert that arguments of a recounted type are bound with a
@@ -287,7 +286,7 @@ class HasIsMethodTag {
   static No& Check(...);
 
  public:
-  static const bool value = sizeof(Check<T>(0)) == sizeof(Yes);
+  enum { value = sizeof(Check<T>(0)) == sizeof(Yes) };
 };
 
 template <typename T>
