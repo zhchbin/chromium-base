@@ -2,6 +2,10 @@
   'targets': [
     {
       'target_name': 'base',
+      'includes': [
+        # Rules for excluding e.g. foo_win.cc from the build on non-Windows.
+        'filename_rules.gypi',
+      ],
       'type': 'static_library',
       'direct_dependent_settings': {
         'include_dirs': [
@@ -33,8 +37,14 @@
         '-std=c++0x',
       ],
       'dependencies': [
-         'src/third_party/libevent/libevent.gyp:libevent'
-       ],
+        'src/third_party/libevent/libevent.gyp:libevent'
+      ],
+      # In Chromium code, we define __STDC_foo_MACROS in order to get the
+      # C99 macros on Mac and Linux.
+      'defines': [
+        '__STDC_CONSTANT_MACROS',
+        '__STDC_FORMAT_MACROS',
+      ],
       'sources': [
         'src/base/at_exit.cc',
         'src/base/at_exit.h',
@@ -195,6 +205,7 @@
         'src/base/threading/platform_thread.h',
         'src/base/threading/platform_thread_linux.cc',
         'src/base/threading/platform_thread_posix.cc',
+        'src/base/threading/platform_thread_win.cc',
         'src/base/time/time.cc',
         'src/base/time/time.h',
         'src/base/time/time_posix.cc',
