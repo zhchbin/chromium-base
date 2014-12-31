@@ -23,16 +23,6 @@
 #define SCNxPTR "x"
 #endif
 
-#ifndef SCNxPTR
-// On Travis CI build, SCNxPTR is undefined in '/usr/include/inttypes.h', so we
-// patched it here to make it work.
-# if __WORDSIZE == 64
-# define SCNxPTR	 "lx"
-# else
-# define SCNxPTR	 "x"
-# endif
-#endif
-
 namespace base {
 namespace debug {
 
