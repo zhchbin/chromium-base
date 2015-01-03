@@ -263,6 +263,8 @@
         'src/base/threading/sequenced_worker_pool.h',
         'src/base/threading/simple_thread.cc',
         'src/base/threading/simple_thread.h',
+        'src/base/threading/thread.cc',
+        'src/base/threading/thread.h',
         'src/base/threading/thread_checker.h',
         'src/base/threading/thread_checker_impl.cc',
         'src/base/threading/thread_checker_impl.h',
