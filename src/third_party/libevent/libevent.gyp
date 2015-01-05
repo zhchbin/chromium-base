@@ -27,6 +27,7 @@
       'defines': [
         'HAVE_CONFIG_H',
       ],
+      'cflags!': ['-Werror'],
       'conditions': [
         # libevent has platform-specific implementation files.  Since its
         # native build uses autoconf, platform-specific config.h files are

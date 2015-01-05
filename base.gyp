@@ -23,9 +23,6 @@
             'ldflags': [
               '-pthread',
             ],
-            'dependencies': [
-              'src/third_party/libevent/libevent.gyp:libevent'
-            ],
           }],
         ],
       },
@@ -52,6 +49,11 @@
             'src/base/message_loop/message_pump_libevent.h',
             'src/base/strings/string16.cc',
             'src/base/strings/string16.h',
+          ],
+        }],
+        ['OS=="linux"', {
+          'dependencies': [
+            'src/third_party/libevent/libevent.gyp:libevent'
           ],
         }],
       ],
@@ -185,6 +187,8 @@
         'src/base/message_loop/message_pump.h',
         'src/base/message_loop/message_pump_default.cc',
         'src/base/message_loop/message_pump_default.h',
+        'src/base/message_loop/message_pump_libevent.cc',
+        'src/base/message_loop/message_pump_libevent.h',
         'src/base/message_loop/message_pump_win.cc',
         'src/base/message_loop/message_pump_win.h',
         'src/base/message_loop/timer_slack.h',
@@ -236,6 +240,8 @@
         'src/base/sequenced_task_runner.cc',
         'src/base/sequenced_task_runner.h',
         'src/base/stl_util.h',
+        'src/base/strings/string16.cc',
+        'src/base/strings/string16.h',
         'src/base/strings/string_number_conversions.cc',
         'src/base/strings/string_number_conversions.h',
         'src/base/strings/string_piece.cc',
