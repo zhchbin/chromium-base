@@ -8,7 +8,6 @@
 
 #include "base/debug/trace_event.h"
 #include "base/message_loop/message_loop.h"
-#include "base/metrics/histogram.h"
 #include "base/process/memory.h"
 #include "base/profiler/scoped_tracker.h"
 #include "base/strings/stringprintf.h"
@@ -111,8 +110,8 @@ void MessagePumpForUI::ScheduleWork() {
   // recovery.  Nested loops are pretty transient (we think), so this will
   // probably be recoverable.
   InterlockedExchange(&have_work_, 0);  // Clarify that we didn't really insert.
-  UMA_HISTOGRAM_ENUMERATION("Chrome.MessageLoopProblem", MESSAGE_POST_ERROR,
-                            MESSAGE_LOOP_PROBLEM_MAX);
+  //UMA_HISTOGRAM_ENUMERATION("Chrome.MessageLoopProblem", MESSAGE_POST_ERROR,
+                            //MESSAGE_LOOP_PROBLEM_MAX);
 }
 
 void MessagePumpForUI::ScheduleDelayedWork(const TimeTicks& delayed_work_time) {
@@ -152,8 +151,8 @@ void MessagePumpForUI::ScheduleDelayedWork(const TimeTicks& delayed_work_time) {
   // If we can't set timers, we are in big trouble... but cross our fingers for
   // now.
   // TODO(jar): If we don't see this error, use a CHECK() here instead.
-  UMA_HISTOGRAM_ENUMERATION("Chrome.MessageLoopProblem", SET_TIMER_ERROR,
-                            MESSAGE_LOOP_PROBLEM_MAX);
+  //UMA_HISTOGRAM_ENUMERATION("Chrome.MessageLoopProblem", SET_TIMER_ERROR,
+                            //MESSAGE_LOOP_PROBLEM_MAX);
 }
 
 //-----------------------------------------------------------------------------
@@ -435,8 +434,8 @@ void MessagePumpForIO::ScheduleWork() {
 
   // See comment in MessagePumpForUI::ScheduleWork() for this error recovery.
   InterlockedExchange(&have_work_, 0);  // Clarify that we didn't succeed.
-  UMA_HISTOGRAM_ENUMERATION("Chrome.MessageLoopProblem", COMPLETION_POST_ERROR,
-                            MESSAGE_LOOP_PROBLEM_MAX);
+  //UMA_HISTOGRAM_ENUMERATION("Chrome.MessageLoopProblem", COMPLETION_POST_ERROR,
+                            //MESSAGE_LOOP_PROBLEM_MAX);
 }
 
 void MessagePumpForIO::ScheduleDelayedWork(const TimeTicks& delayed_work_time) {
