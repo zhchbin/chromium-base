@@ -1,5 +1,4 @@
 #!/bin/bash
 
 git clone https://github.com/svn2github/gyp
-./gyp/gyp --depth . base.gyp
-make
+./gyp/gyp --depth . base.gyp -I src/build/common.gypi && make
