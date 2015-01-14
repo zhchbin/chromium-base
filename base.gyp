@@ -2,10 +2,6 @@
   'targets': [
     {
       'target_name': 'base',
-      'includes': [
-        # Rules for excluding e.g. foo_win.cc from the build on non-Windows.
-        'filename_rules.gypi',
-      ],
       'type': 'static_library',
       'direct_dependent_settings': {
         'include_dirs': [
@@ -244,6 +240,10 @@
         'src/base/profiler/scoped_tracker.h',
         'src/base/profiler/tracked_time.cc',
         'src/base/profiler/tracked_time.h',
+        'src/base/rand_util.cc',
+        'src/base/rand_util.h',
+        'src/base/rand_util_posix.cc',
+        'src/base/rand_util_win.cc',
         'src/base/run_loop.cc',
         'src/base/run_loop.h',
         'src/base/safe_strerror_posix.cc',
