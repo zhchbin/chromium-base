@@ -35,7 +35,7 @@
           'GCC_PRECOMPILE_PREFIX_HEADER': 'NO',
           'GCC_SYMBOLS_PRIVATE_EXTERN': 'YES',      # -fvisibility=hidden
           'GCC_THREADSAFE_STATICS': 'NO',           # -fno-threadsafe-statics
-          'GCC_TREAT_WARNINGS_AS_ERRORS': 'YES',    # -Werror
+          'GCC_TREAT_WARNINGS_AS_ERRORS': 'NO',    # -Werror
           'GCC_WARN_ABOUT_MISSING_NEWLINE': 'YES',  # -Wnewline-eof
           'OTHER_CFLAGS': [
             '-fno-strict-aliasing',   # See http://crbug.com/32204
@@ -100,7 +100,7 @@
           '-pipe',
           '-pthread',
           '-Wall',
-          '-Werror',
+          # '-Werror',
           '-Wextra',
           '-Wno-unused-parameter',
           '-Wno-missing-field-initializers',
@@ -144,7 +144,7 @@
         'msvs_settings': {
           'VCCLCompilerTool': {
             'WarningLevel': '4',
-            'WarnAsError': 'true',
+            'WarnAsError': 'false',
             'DebugInformationFormat': '3',
             'ExceptionHandling': '0',
             'RuntimeTypeInfo': 'false',
