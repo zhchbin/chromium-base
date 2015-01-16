@@ -159,6 +159,7 @@
               'ole32.lib',
               'shell32.lib',
               'user32.lib',
+              'ws2_32.lib',
             ],
           },
         },
@@ -167,6 +168,7 @@
           4100,  # Unreferenced formal parameter.
           4127,  # Conditional expression is constant.
           4201,  # Nonstandard extension used : nameless struct/union.
+          4244,
           4351,  # New behavior: elements of array will be default initialized.
           4512,
           4530,  # Exceptions are disabled.
