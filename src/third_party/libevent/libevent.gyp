@@ -28,6 +28,10 @@
         'HAVE_CONFIG_H',
       ],
       'cflags!': ['-Werror'],
+      'cflags':[
+        '-Wno-sign-compare',
+        '-Wno-unused-but-set-variable',
+      ],
       'conditions': [
         # libevent has platform-specific implementation files.  Since its
         # native build uses autoconf, platform-specific config.h files are
