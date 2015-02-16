@@ -173,6 +173,7 @@
         'src/base/location.h',
         'src/base/logging.cc',
         'src/base/logging.h',
+        'src/base/md5.cc',
         'src/base/memory/raw_scoped_refptr_mismatch_checker.h',
         'src/base/memory/ref_counted.cc',
         'src/base/memory/ref_counted.h',
