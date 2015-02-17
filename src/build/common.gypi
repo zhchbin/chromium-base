@@ -152,7 +152,7 @@
             'EnableFunctionLevelLinking': 'true',
           },
           'VCLinkerTool': {
-            'GenerateDebugInformation': 'true',
+            'GenerateDebugInformation': 'false',
             'AdditionalDependencies': [
               'advapi32.lib',
               'dbgHelp.lib',
