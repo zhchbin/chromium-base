@@ -51,6 +51,9 @@
           'dependencies': [
             'src/third_party/libevent/libevent.gyp:libevent'
           ],
+          'sources': [
+            'src/base/nix/xdg_util.cc',
+          ],
         }],
       ],
       'sources': [
@@ -211,7 +214,6 @@
         'src/base/message_loop/message_pump_win.h',
         'src/base/message_loop/timer_slack.h',
         'src/base/move.h',
-        'src/base/nix/xdg_util.cc',
         'src/base/path_service.cc',
         'src/base/path_service.h',
         'src/base/pending_task.cc',
